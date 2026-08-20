@@ -1,0 +1,3192 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "Concerts Gate Platform API",
+    "description": "Concerts Gate Backend API supporting high-concurrency Flash Sales, Anti-Overselling, Idempotency, and Operations Management. But This is only static swagger.json file, you can use the swagger-ui to test the API endpoints.",
+    "contact": {
+      "name": "Concerts Gate Engineering Team",
+      "email": "tt.tan25204@gmail.com"
+    },
+    "version": "v1"
+  },
+  "paths": {
+    "/api/admin/bookings": {
+      "get": {
+        "tags": ["AdminBookings"],
+        "summary": "Retrieves a paginated list of all bookings across the system for monitoring (supports status and concert filters, and search).",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Filter by booking status (PendingPayment, Confirmed, Expired, Suspicious, etc.).",
+            "schema": {
+              "$ref": "#/components/schemas/BookingStatus"
+            }
+          },
+          {
+            "name": "concertId",
+            "in": "query",
+            "description": "Filter by concert ID.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "description": "Search by booking code, user email, or customer name.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageIndex",
+            "in": "query",
+            "description": "Page index (default 1).",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "description": "Items per page (default 20).",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns paginated booking list.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingResponseDtoPaginatedResultApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/bookings/{id}": {
+      "get": {
+        "tags": ["AdminBookings"],
+        "summary": "Retrieves full details for any booking order by ID.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Booking unique identifier (GUID).",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns detailed booking info.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingResponseDtoApiResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Booking not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/bookings/{id}/status": {
+      "patch": {
+        "tags": ["AdminBookings"],
+        "summary": "Manually updates the status of a booking during incident resolution (e.g. manual confirmation, cancellation, refund).",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Booking unique identifier (GUID).",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "New status and intervention rationale.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBookingStatusDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBookingStatusDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBookingStatusDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Status updated and audit log recorded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingResponseDtoApiResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid new status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/bookings/{id}/flag-suspicious": {
+      "post": {
+        "tags": ["AdminBookings"],
+        "summary": "Flags a booking as suspicious (fraud / bot detection) or clears a previous flag.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Booking unique identifier (GUID).",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Suspicion flag and justification.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FlagSuspiciousBookingDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FlagSuspiciousBookingDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/FlagSuspiciousBookingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Suspicion status updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingResponseDtoApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/concerts": {
+      "get": {
+        "tags": ["AdminConcerts"],
+        "summary": "Retrieves a paginated list of all concerts (including Draft, Published, Archived) for the operations console.",
+        "parameters": [
+          {
+            "name": "pageIndex",
+            "in": "query",
+            "description": "Page index (default 1).",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "description": "Items per page (default 20).",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns paginated concert list.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConcertDetailDtoPaginatedResultApiResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["AdminConcerts"],
+        "summary": "Creates a new concert event and optional initial ticket categories.",
+        "requestBody": {
+          "description": "Concert creation payload.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateConcertDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateConcertDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateConcertDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Concert created successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConcertDetailDtoApiResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid payload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/concerts/{id}": {
+      "put": {
+        "tags": ["AdminConcerts"],
+        "summary": "Updates details of an existing concert.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Concert unique identifier (GUID).",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Update payload.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateConcertDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateConcertDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateConcertDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Concert updated successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConcertDetailDtoApiResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Concert not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/concerts/{id}/status": {
+      "patch": {
+        "tags": ["AdminConcerts"],
+        "summary": "Changes the publication status of a concert (Draft, Published, Archived, Cancelled).",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Concert unique identifier.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "New status.",
+            "schema": {
+              "$ref": "#/components/schemas/ConcertStatus"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Status changed successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BooleanApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/concerts/{id}/categories": {
+      "post": {
+        "tags": ["AdminConcerts"],
+        "summary": "Adds a new ticket category (VIP, Standard, etc.) to an existing concert.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Concert unique identifier.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Ticket category creation payload.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTicketCategoryDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTicketCategoryDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTicketCategoryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ticket category added successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketCategoryDtoApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/concerts/categories/{categoryId}/inventory": {
+      "put": {
+        "tags": ["AdminConcerts"],
+        "summary": "Adjusts the total allocated ticket inventory for a category from the operations dashboard.",
+        "parameters": [
+          {
+            "name": "categoryId",
+            "in": "path",
+            "description": "Ticket category unique identifier (GUID).",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "New total inventory quantity.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateInventoryDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateInventoryDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateInventoryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Inventory updated successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketCategoryDtoApiResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "New total is lower than sold and reserved quantities combined.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/vouchers": {
+      "get": {
+        "tags": ["AdminVouchers"],
+        "summary": "Retrieves a paginated list of all vouchers with usage statistics and active status.",
+        "parameters": [
+          {
+            "name": "pageIndex",
+            "in": "query",
+            "description": "Page index (default 1).",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "description": "Items per page (default 20).",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns paginated vouchers list.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoucherDtoPaginatedResultApiResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["AdminVouchers"],
+        "summary": "Creates a new promotional voucher campaign with global and per-account usage limits.",
+        "requestBody": {
+          "description": "Voucher configuration parameters.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateVoucherDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateVoucherDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateVoucherDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Voucher created successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VoucherDtoApiResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Voucher code exists or invalid date range.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/vouchers/{id}/toggle-status": {
+      "patch": {
+        "tags": ["AdminVouchers"],
+        "summary": "Toggles the active status of a voucher (pause or reactivate campaign).",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Voucher unique identifier (GUID).",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "isActive",
+            "in": "query",
+            "description": "Active status (true = active, false = paused).",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Voucher status toggled successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BooleanApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Auth/register": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Registers a new customer account in the Concerts Gate system.",
+        "requestBody": {
+          "description": "Registration details (Email, Password, Full Name, Phone Number).",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequestDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequestDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Registration successful, returns JWT token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponseDtoApiResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid payload or email already exists.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Auth/login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Authenticates credentials and returns a JWT Bearer token.",
+        "requestBody": {
+          "description": "Login credentials (email and password).",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequestDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequestDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login successful, returns JWT token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponseDtoApiResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid email or password.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Auth/me": {
+      "get": {
+        "tags": ["Auth"],
+        "summary": "Retrieves profile details for the currently authenticated user based on JWT claims.",
+        "responses": {
+          "200": {
+            "description": "Returns user profile information.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfileDtoApiResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized or invalid token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Bookings": {
+      "post": {
+        "tags": ["Bookings"],
+        "summary": "Creates a temporary ticket reservation held for 10 minutes (Reserve Tickets).",
+        "description": "Supports the `X-Idempotency-Key` header to prevent duplicate orders upon network retries.\r\nEmploys Optimistic Concurrency Control to eliminate overselling in high-traffic Flash Sales.",
+        "parameters": [
+          {
+            "name": "X-Idempotency-Key",
+            "in": "header",
+            "description": "Idempotency key from request header (optional but recommended).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Concert ID, ticket categories, quantities, and optional voucher code.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBookingRequestDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBookingRequestDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBookingRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reservation successful, returns booking details and expiration countdown (TTL).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingResponseDtoApiResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid payload or event not open for sale.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Sold out or concurrency conflict during Flash Sale rush.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Bookings/{id}/pay": {
+      "post": {
+        "tags": ["Bookings"],
+        "summary": "Simulates online payment for a booking order and issues electronic tickets with QR codes.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Booking unique identifier (GUID).",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Payment method and transaction reference.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentSimulationRequestDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentSimulationRequestDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentSimulationRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Payment completed, status updated to Confirmed and e-tickets returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingResponseDtoApiResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid booking, expired reservation hold, or already completed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Bookings/{id}/cancel": {
+      "post": {
+        "tags": ["Bookings"],
+        "summary": "Customer initiates cancellation of an unpaid reservation hold (PendingPayment) to release tickets back to inventory.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Booking unique identifier.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reservation cancelled successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BooleanApiResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Booking is not in a cancellable status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Bookings/{id}": {
+      "get": {
+        "tags": ["Bookings"],
+        "summary": "Retrieves detailed booking information by ID.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Booking unique identifier (GUID).",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns booking details.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingResponseDtoApiResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Booking not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Bookings/my-bookings": {
+      "get": {
+        "tags": ["Bookings"],
+        "summary": "Retrieves paginated booking history for the current customer (includes status, amounts, and QR tickets).",
+        "parameters": [
+          {
+            "name": "pageIndex",
+            "in": "query",
+            "description": "Page index (default 1).",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "description": "Items per page (default 10).",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns paginated booking list.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingResponseDtoPaginatedResultApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Concerts": {
+      "get": {
+        "tags": ["Concerts"],
+        "summary": "Retrieves a paginated list of published concerts available for sale (supports searching, genre filtering, and Flash Sale filter).",
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "description": "Search keyword across concert title, artist, or venue.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "genre",
+            "in": "query",
+            "description": "Music genre (Pop, Rock, EDM, etc.).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "onlyFlashSale",
+            "in": "query",
+            "description": "Filter exclusively for Flash Sale events.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "pageIndex",
+            "in": "query",
+            "description": "Page index (default 1).",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "description": "Number of concerts per page (default 10).",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns paginated list of concerts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConcertSummaryDtoPaginatedResultApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Concerts/{id}": {
+      "get": {
+        "tags": ["Concerts"],
+        "summary": "Retrieves full details of a concert event including ticket categories (VIP, Standard, etc.) and remaining seat counts.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Unique identifier of the concert (GUID).",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns concert details.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConcertDetailDtoApiResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Concert not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/Dashboard/stats": {
+      "get": {
+        "tags": ["Dashboard"],
+        "summary": "Retrieves full operational summary metrics: Revenue, Sold tickets, Reserved tickets, Breakdown by status, and Top concerts.",
+        "responses": {
+          "200": {
+            "description": "Returns dashboard metrics.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardStatsDtoApiResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden from accessing internal operations dashboard."
+          }
+        }
+      }
+    },
+    "/api/admin/Dashboard/inventory-validation/{concertId}": {
+      "get": {
+        "tags": ["Dashboard"],
+        "summary": "Checks and audits the inventory consistency (Remaining + Reserved + Sold == Total) for a specific concert event.",
+        "parameters": [
+          {
+            "name": "concertId",
+            "in": "path",
+            "description": "Concert unique identifier to validate.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns inventory validation report.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryValidationReportDtoApiResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Concert not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/Vouchers/validate": {
+      "post": {
+        "tags": ["Vouchers"],
+        "summary": "Validates a promotional voucher code and computes the discount amount before placing a booking order.",
+        "requestBody": {
+          "description": "Voucher code and order subtotal amount.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ValidateVoucherRequestDto"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ValidateVoucherRequestDto"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ValidateVoucherRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Voucher is valid, returns calculated discount amount.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidateVoucherResponseDtoApiResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Voucher is invalid, expired, exhausted, or minimum order threshold not met.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObjectApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AuthResponseDto": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "User identifier (GUID).",
+            "format": "uuid"
+          },
+          "fullName": {
+            "type": "string",
+            "description": "Full name of the user.",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "description": "Email address.",
+            "nullable": true
+          },
+          "role": {
+            "$ref": "#/components/schemas/UserRole"
+          },
+          "token": {
+            "type": "string",
+            "description": "JSON Web Token (JWT) to attach to HTTP Authorization Header (Bearer token).",
+            "nullable": true
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "Token expiration timestamp (UTC).",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Authentication response payload containing user info and a JWT token."
+      },
+      "AuthResponseDtoApiResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Indicates whether the request was processed successfully."
+          },
+          "message": {
+            "type": "string",
+            "description": "User-friendly response message or error summary.",
+            "nullable": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/AuthResponseDto"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Detailed list of error messages (if any).",
+            "nullable": true
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "UTC timestamp of response generation.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Standard API response wrapper across the system."
+      },
+      "BookingItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Line item unique identifier.",
+            "format": "uuid"
+          },
+          "ticketCategoryId": {
+            "type": "string",
+            "description": "Ticket category identifier.",
+            "format": "uuid"
+          },
+          "categoryName": {
+            "type": "string",
+            "description": "Ticket category name.",
+            "nullable": true
+          },
+          "quantity": {
+            "type": "integer",
+            "description": "Ticket quantity.",
+            "format": "int32"
+          },
+          "unitPrice": {
+            "type": "number",
+            "description": "Unit price at time of booking.",
+            "format": "double"
+          },
+          "subtotal": {
+            "type": "number",
+            "description": "Line subtotal.",
+            "format": "double",
+            "readOnly": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Booking item details returned to the customer."
+      },
+      "BookingItemRequestDto": {
+        "required": ["ticketCategoryId"],
+        "type": "object",
+        "properties": {
+          "ticketCategoryId": {
+            "type": "string",
+            "description": "Identifier of the selected ticket category.",
+            "format": "uuid"
+          },
+          "quantity": {
+            "maximum": 10,
+            "minimum": 1,
+            "type": "integer",
+            "description": "Quantity of tickets to reserve for this category.",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Line item request for reserving a specific ticket category."
+      },
+      "BookingResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Booking unique identifier (GUID).",
+            "format": "uuid"
+          },
+          "bookingCode": {
+            "type": "string",
+            "description": "User-friendly booking reference code (e.g. \"CG-20260819-8X9Y\").",
+            "nullable": true
+          },
+          "concertId": {
+            "type": "string",
+            "description": "Concert identifier.",
+            "format": "uuid"
+          },
+          "concertTitle": {
+            "type": "string",
+            "description": "Concert title.",
+            "nullable": true
+          },
+          "artist": {
+            "type": "string",
+            "description": "Performing artist.",
+            "nullable": true
+          },
+          "venue": {
+            "type": "string",
+            "description": "Venue location.",
+            "nullable": true
+          },
+          "eventDate": {
+            "type": "string",
+            "description": "Event date and time.",
+            "format": "date-time"
+          },
+          "originalAmount": {
+            "type": "number",
+            "description": "Original subtotal before discounts (VND).",
+            "format": "double"
+          },
+          "discountAmount": {
+            "type": "number",
+            "description": "Discount amount applied (VND).",
+            "format": "double"
+          },
+          "finalAmount": {
+            "type": "number",
+            "description": "Final amount payable (VND).",
+            "format": "double"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BookingStatus"
+          },
+          "appliedVoucherCode": {
+            "type": "string",
+            "description": "Applied voucher code (if any).",
+            "nullable": true
+          },
+          "reservationExpiresAt": {
+            "type": "string",
+            "description": "Reservation expiration timestamp (TTL).",
+            "format": "date-time"
+          },
+          "remainingSeconds": {
+            "type": "integer",
+            "description": "Seconds remaining before reservation expires (countdown).",
+            "format": "int32",
+            "readOnly": true
+          },
+          "paidAt": {
+            "type": "string",
+            "description": "Payment completion timestamp (if paid).",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Booking creation timestamp.",
+            "format": "date-time"
+          },
+          "notes": {
+            "type": "string",
+            "description": "Operational or customer notes.",
+            "nullable": true
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BookingItemDto"
+            },
+            "description": "Itemized list of ticket categories and quantities in this booking.",
+            "nullable": true
+          },
+          "tickets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TicketDto"
+            },
+            "description": "Electronic tickets issued (populated when status is Confirmed).",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Comprehensive booking response payload."
+      },
+      "BookingResponseDtoApiResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Indicates whether the request was processed successfully."
+          },
+          "message": {
+            "type": "string",
+            "description": "User-friendly response message or error summary.",
+            "nullable": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/BookingResponseDto"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Detailed list of error messages (if any).",
+            "nullable": true
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "UTC timestamp of response generation.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Standard API response wrapper across the system."
+      },
+      "BookingResponseDtoPaginatedResult": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BookingResponseDto"
+            },
+            "description": "Items on the current page.",
+            "nullable": true
+          },
+          "pageIndex": {
+            "type": "integer",
+            "description": "Current page index (1-indexed).",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "Page size / number of items per page.",
+            "format": "int32"
+          },
+          "totalCount": {
+            "type": "integer",
+            "description": "Total count of items matching the query across all pages.",
+            "format": "int32"
+          },
+          "totalPages": {
+            "type": "integer",
+            "description": "Total number of pages.",
+            "format": "int32",
+            "readOnly": true
+          },
+          "hasPreviousPage": {
+            "type": "boolean",
+            "description": "Indicates whether a previous page exists.",
+            "readOnly": true
+          },
+          "hasNextPage": {
+            "type": "boolean",
+            "description": "Indicates whether a next page exists.",
+            "readOnly": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Paginated query result wrapper for large data collections."
+      },
+      "BookingResponseDtoPaginatedResultApiResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Indicates whether the request was processed successfully."
+          },
+          "message": {
+            "type": "string",
+            "description": "User-friendly response message or error summary.",
+            "nullable": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/BookingResponseDtoPaginatedResult"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Detailed list of error messages (if any).",
+            "nullable": true
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "UTC timestamp of response generation.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Standard API response wrapper across the system."
+      },
+      "BookingStatus": {
+        "enum": [0, 1, 2, 3, 4, 5],
+        "type": "integer",
+        "description": "Status of a booking order across its state machine lifecycle (PendingPayment, Confirmed, Expired, Cancelled, Suspicious, Refunded).",
+        "format": "int32"
+      },
+      "BooleanApiResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Indicates whether the request was processed successfully."
+          },
+          "message": {
+            "type": "string",
+            "description": "User-friendly response message or error summary.",
+            "nullable": true
+          },
+          "data": {
+            "type": "boolean",
+            "description": "Response payload data."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Detailed list of error messages (if any).",
+            "nullable": true
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "UTC timestamp of response generation.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Standard API response wrapper across the system."
+      },
+      "CategoryInventoryCheckDto": {
+        "type": "object",
+        "properties": {
+          "categoryId": {
+            "type": "string",
+            "description": "Ticket category ID.",
+            "format": "uuid"
+          },
+          "categoryName": {
+            "type": "string",
+            "description": "Ticket category name.",
+            "nullable": true
+          },
+          "totalQuantity": {
+            "type": "integer",
+            "description": "Total original ticket capacity allocated.",
+            "format": "int32"
+          },
+          "remainingQuantity": {
+            "type": "integer",
+            "description": "Available tickets remaining.",
+            "format": "int32"
+          },
+          "reservedQuantity": {
+            "type": "integer",
+            "description": "Reserved tickets currently on hold (PendingPayment).",
+            "format": "int32"
+          },
+          "soldQuantity": {
+            "type": "integer",
+            "description": "Confirmed sold tickets.",
+            "format": "int32"
+          },
+          "calculatedTotal": {
+            "type": "integer",
+            "description": "Calculated total (Remaining + Reserved + Sold).",
+            "format": "int32",
+            "readOnly": true
+          },
+          "isBalanced": {
+            "type": "boolean",
+            "description": "Indicates whether the category inventory is perfectly balanced.",
+            "readOnly": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Inventory reconciliation per ticket category (Remaining + Reserved + Sold == Total)."
+      },
+      "ConcertDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Concert unique identifier.",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "description": "Concert title.",
+            "nullable": true
+          },
+          "artist": {
+            "type": "string",
+            "description": "Performing artist or headline band.",
+            "nullable": true
+          },
+          "venue": {
+            "type": "string",
+            "description": "Venue location.",
+            "nullable": true
+          },
+          "genre": {
+            "type": "string",
+            "description": "Music genre.",
+            "nullable": true
+          },
+          "bannerUrl": {
+            "type": "string",
+            "description": "URL to the banner cover image.",
+            "nullable": true
+          },
+          "eventDate": {
+            "type": "string",
+            "description": "Event performance date and time (UTC).",
+            "format": "date-time"
+          },
+          "saleStartDate": {
+            "type": "string",
+            "description": "Ticket sales start date and time.",
+            "format": "date-time"
+          },
+          "saleEndDate": {
+            "type": "string",
+            "description": "Ticket sales end date and time.",
+            "format": "date-time"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ConcertStatus"
+          },
+          "isFlashSale": {
+            "type": "boolean",
+            "description": "Indicates whether the concert is featured as a Flash Sale."
+          },
+          "minPrice": {
+            "type": "number",
+            "description": "Minimum ticket price among all tiers.",
+            "format": "double"
+          },
+          "maxPrice": {
+            "type": "number",
+            "description": "Maximum ticket price among all tiers.",
+            "format": "double"
+          },
+          "isSaleOpen": {
+            "type": "boolean",
+            "description": "Indicates whether ticket sales are currently open.",
+            "readOnly": true
+          },
+          "totalRemainingTickets": {
+            "type": "integer",
+            "description": "Total remaining tickets across all categories.",
+            "format": "int32"
+          },
+          "description": {
+            "type": "string",
+            "description": "Detailed description of the concert event.",
+            "nullable": true
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TicketCategoryDto"
+            },
+            "description": "Available ticket categories for booking.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Detailed concert payload including full description and available ticket categories."
+      },
+      "ConcertDetailDtoApiResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Indicates whether the request was processed successfully."
+          },
+          "message": {
+            "type": "string",
+            "description": "User-friendly response message or error summary.",
+            "nullable": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/ConcertDetailDto"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Detailed list of error messages (if any).",
+            "nullable": true
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "UTC timestamp of response generation.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Standard API response wrapper across the system."
+      },
+      "ConcertDetailDtoPaginatedResult": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConcertDetailDto"
+            },
+            "description": "Items on the current page.",
+            "nullable": true
+          },
+          "pageIndex": {
+            "type": "integer",
+            "description": "Current page index (1-indexed).",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "Page size / number of items per page.",
+            "format": "int32"
+          },
+          "totalCount": {
+            "type": "integer",
+            "description": "Total count of items matching the query across all pages.",
+            "format": "int32"
+          },
+          "totalPages": {
+            "type": "integer",
+            "description": "Total number of pages.",
+            "format": "int32",
+            "readOnly": true
+          },
+          "hasPreviousPage": {
+            "type": "boolean",
+            "description": "Indicates whether a previous page exists.",
+            "readOnly": true
+          },
+          "hasNextPage": {
+            "type": "boolean",
+            "description": "Indicates whether a next page exists.",
+            "readOnly": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Paginated query result wrapper for large data collections."
+      },
+      "ConcertDetailDtoPaginatedResultApiResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Indicates whether the request was processed successfully."
+          },
+          "message": {
+            "type": "string",
+            "description": "User-friendly response message or error summary.",
+            "nullable": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/ConcertDetailDtoPaginatedResult"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Detailed list of error messages (if any).",
+            "nullable": true
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "UTC timestamp of response generation.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Standard API response wrapper across the system."
+      },
+      "ConcertStatus": {
+        "enum": [0, 1, 2, 3],
+        "type": "integer",
+        "description": "Publication status of a concert (Draft, Published, Archived, Cancelled).",
+        "format": "int32"
+      },
+      "ConcertSummaryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Concert unique identifier.",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "description": "Concert title.",
+            "nullable": true
+          },
+          "artist": {
+            "type": "string",
+            "description": "Performing artist or headline band.",
+            "nullable": true
+          },
+          "venue": {
+            "type": "string",
+            "description": "Venue location.",
+            "nullable": true
+          },
+          "genre": {
+            "type": "string",
+            "description": "Music genre.",
+            "nullable": true
+          },
+          "bannerUrl": {
+            "type": "string",
+            "description": "URL to the banner cover image.",
+            "nullable": true
+          },
+          "eventDate": {
+            "type": "string",
+            "description": "Event performance date and time (UTC).",
+            "format": "date-time"
+          },
+          "saleStartDate": {
+            "type": "string",
+            "description": "Ticket sales start date and time.",
+            "format": "date-time"
+          },
+          "saleEndDate": {
+            "type": "string",
+            "description": "Ticket sales end date and time.",
+            "format": "date-time"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ConcertStatus"
+          },
+          "isFlashSale": {
+            "type": "boolean",
+            "description": "Indicates whether the concert is featured as a Flash Sale."
+          },
+          "minPrice": {
+            "type": "number",
+            "description": "Minimum ticket price among all tiers.",
+            "format": "double"
+          },
+          "maxPrice": {
+            "type": "number",
+            "description": "Maximum ticket price among all tiers.",
+            "format": "double"
+          },
+          "isSaleOpen": {
+            "type": "boolean",
+            "description": "Indicates whether ticket sales are currently open.",
+            "readOnly": true
+          },
+          "totalRemainingTickets": {
+            "type": "integer",
+            "description": "Total remaining tickets across all categories.",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Summary concert data displayed in search listings and the catalog homepage."
+      },
+      "ConcertSummaryDtoPaginatedResult": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConcertSummaryDto"
+            },
+            "description": "Items on the current page.",
+            "nullable": true
+          },
+          "pageIndex": {
+            "type": "integer",
+            "description": "Current page index (1-indexed).",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "Page size / number of items per page.",
+            "format": "int32"
+          },
+          "totalCount": {
+            "type": "integer",
+            "description": "Total count of items matching the query across all pages.",
+            "format": "int32"
+          },
+          "totalPages": {
+            "type": "integer",
+            "description": "Total number of pages.",
+            "format": "int32",
+            "readOnly": true
+          },
+          "hasPreviousPage": {
+            "type": "boolean",
+            "description": "Indicates whether a previous page exists.",
+            "readOnly": true
+          },
+          "hasNextPage": {
+            "type": "boolean",
+            "description": "Indicates whether a next page exists.",
+            "readOnly": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Paginated query result wrapper for large data collections."
+      },
+      "ConcertSummaryDtoPaginatedResultApiResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Indicates whether the request was processed successfully."
+          },
+          "message": {
+            "type": "string",
+            "description": "User-friendly response message or error summary.",
+            "nullable": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/ConcertSummaryDtoPaginatedResult"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Detailed list of error messages (if any).",
+            "nullable": true
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "UTC timestamp of response generation.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Standard API response wrapper across the system."
+      },
+      "CreateBookingRequestDto": {
+        "required": ["concertId", "items"],
+        "type": "object",
+        "properties": {
+          "concertId": {
+            "type": "string",
+            "description": "Identifier of the concert being booked.",
+            "format": "uuid"
+          },
+          "items": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BookingItemRequestDto"
+            },
+            "description": "List of ticket categories and requested quantities."
+          },
+          "voucherCode": {
+            "type": "string",
+            "description": "Promotional voucher code (optional).",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Request payload for creating a temporary ticket reservation."
+      },
+      "CreateConcertDto": {
+        "required": [
+          "artist",
+          "eventDate",
+          "saleEndDate",
+          "saleStartDate",
+          "title",
+          "venue"
+        ],
+        "type": "object",
+        "properties": {
+          "title": {
+            "maxLength": 250,
+            "minLength": 0,
+            "type": "string",
+            "description": "Title of the concert."
+          },
+          "artist": {
+            "maxLength": 200,
+            "minLength": 0,
+            "type": "string",
+            "description": "Main performing artist or band name."
+          },
+          "description": {
+            "type": "string",
+            "description": "Detailed description of the event.",
+            "nullable": true
+          },
+          "venue": {
+            "maxLength": 300,
+            "minLength": 0,
+            "type": "string",
+            "description": "Venue location."
+          },
+          "bannerUrl": {
+            "type": "string",
+            "description": "URL to the banner cover image.",
+            "nullable": true
+          },
+          "genre": {
+            "type": "string",
+            "description": "Music genre.",
+            "nullable": true
+          },
+          "eventDate": {
+            "type": "string",
+            "description": "Event performance date and time.",
+            "format": "date-time"
+          },
+          "saleStartDate": {
+            "type": "string",
+            "description": "Ticket sales start date and time.",
+            "format": "date-time"
+          },
+          "saleEndDate": {
+            "type": "string",
+            "description": "Ticket sales end date and time.",
+            "format": "date-time"
+          },
+          "isFlashSale": {
+            "type": "boolean",
+            "description": "Indicates whether this concert is part of a Flash Sale campaign."
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreateTicketCategoryDto"
+            },
+            "description": "Optional ticket categories initialized along with the concert.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input payload for creating a new concert (Admin/Operator)."
+      },
+      "CreateTicketCategoryDto": {
+        "required": ["name"],
+        "type": "object",
+        "properties": {
+          "name": {
+            "maxLength": 100,
+            "minLength": 0,
+            "type": "string",
+            "description": "Name of the ticket category (e.g. VIP, Early Bird, General Admission)."
+          },
+          "description": {
+            "type": "string",
+            "description": "Tier description and benefits.",
+            "nullable": true
+          },
+          "price": {
+            "maximum": 1000000000,
+            "minimum": 0,
+            "type": "number",
+            "description": "Unit ticket price (VND).",
+            "format": "double"
+          },
+          "totalQuantity": {
+            "maximum": 1000000,
+            "minimum": 1,
+            "type": "integer",
+            "description": "Total quantity of tickets to issue.",
+            "format": "int32"
+          },
+          "maxPerOrder": {
+            "maximum": 20,
+            "minimum": 1,
+            "type": "integer",
+            "description": "Maximum allowed tickets per order (default is 4).",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input payload for creating a new ticket category for a concert."
+      },
+      "CreateVoucherDto": {
+        "required": ["code", "validFrom", "validTo"],
+        "type": "object",
+        "properties": {
+          "code": {
+            "maxLength": 50,
+            "minLength": 3,
+            "type": "string",
+            "description": "Promotional voucher code in uppercase alphanumeric characters (e.g. \"VIP2026\")."
+          },
+          "description": {
+            "type": "string",
+            "description": "Campaign description and offer details.",
+            "nullable": true
+          },
+          "discountType": {
+            "$ref": "#/components/schemas/DiscountType"
+          },
+          "discountValue": {
+            "maximum": 1000000000,
+            "minimum": 1,
+            "type": "number",
+            "description": "Discount amount (% between 1-100 if Percentage, or fixed VND amount > 0).",
+            "format": "double"
+          },
+          "maxDiscountAmount": {
+            "type": "number",
+            "description": "Maximum discount cap when using Percentage discount.",
+            "format": "double",
+            "nullable": true
+          },
+          "minOrderAmount": {
+            "type": "number",
+            "description": "Minimum order subtotal required to apply voucher (VND).",
+            "format": "double"
+          },
+          "maxUsageCount": {
+            "maximum": 1000000,
+            "minimum": 1,
+            "type": "integer",
+            "description": "Total maximum usage count across the entire system.",
+            "format": "int32"
+          },
+          "maxUsagePerUser": {
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer",
+            "description": "Maximum redemptions allowed per customer account (default is 1).",
+            "format": "int32"
+          },
+          "validFrom": {
+            "type": "string",
+            "description": "Validity start date and time (UTC).",
+            "format": "date-time"
+          },
+          "validTo": {
+            "type": "string",
+            "description": "Validity expiration date and time (UTC).",
+            "format": "date-time"
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Active status flag upon creation."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input payload for creating a new promotional voucher campaign (Admin/Operator)."
+      },
+      "DashboardStatsDto": {
+        "type": "object",
+        "properties": {
+          "totalRevenue": {
+            "type": "number",
+            "description": "Total revenue from successfully completed orders (VND).",
+            "format": "double"
+          },
+          "totalTicketsSold": {
+            "type": "integer",
+            "description": "Total count of tickets successfully sold (Confirmed).",
+            "format": "int32"
+          },
+          "totalTicketsReserved": {
+            "type": "integer",
+            "description": "Total count of tickets currently reserved (PendingPayment) across all concerts.",
+            "format": "int32"
+          },
+          "totalBookingsCount": {
+            "type": "integer",
+            "description": "Total number of bookings created across the system.",
+            "format": "int32"
+          },
+          "pendingBookingsCount": {
+            "type": "integer",
+            "description": "Number of bookings currently awaiting payment.",
+            "format": "int32"
+          },
+          "confirmedBookingsCount": {
+            "type": "integer",
+            "description": "Number of bookings with confirmed payment.",
+            "format": "int32"
+          },
+          "expiredBookingsCount": {
+            "type": "integer",
+            "description": "Number of bookings that expired due to unpaid TTL.",
+            "format": "int32"
+          },
+          "suspiciousBookingsCount": {
+            "type": "integer",
+            "description": "Number of bookings flagged as suspicious (fraud / bot activity).",
+            "format": "int32"
+          },
+          "cancelledBookingsCount": {
+            "type": "integer",
+            "description": "Number of cancelled bookings.",
+            "format": "int32"
+          },
+          "conversionRate": {
+            "type": "number",
+            "description": "Payment conversion rate (%).",
+            "format": "double",
+            "readOnly": true
+          },
+          "topConcerts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TopConcertStatsDto"
+            },
+            "description": "Top 5 performing concerts by revenue or sales volume.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "High-level business performance metrics and ticketing status across the entire system for the operations dashboard."
+      },
+      "DashboardStatsDtoApiResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Indicates whether the request was processed successfully."
+          },
+          "message": {
+            "type": "string",
+            "description": "User-friendly response message or error summary.",
+            "nullable": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/DashboardStatsDto"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Detailed list of error messages (if any).",
+            "nullable": true
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "UTC timestamp of response generation.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Standard API response wrapper across the system."
+      },
+      "DiscountType": {
+        "enum": [0, 1],
+        "type": "integer",
+        "description": "Discount calculation method for promotional vouchers (Percentage, FixedAmount).",
+        "format": "int32"
+      },
+      "FlagSuspiciousBookingDto": {
+        "required": ["reason"],
+        "type": "object",
+        "properties": {
+          "isSuspicious": {
+            "type": "boolean",
+            "description": "Mark as suspicious (true) or clear the flag (false)."
+          },
+          "reason": {
+            "minLength": 1,
+            "type": "string",
+            "description": "Rationale for flagging (e.g. anomalous IP, multiple failed card attempts, rapid bot requests)."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Request payload for flagging or unflagging a booking as suspicious."
+      },
+      "InventoryValidationReportDto": {
+        "type": "object",
+        "properties": {
+          "concertId": {
+            "type": "string",
+            "description": "Concert identifier.",
+            "format": "uuid"
+          },
+          "concertTitle": {
+            "type": "string",
+            "description": "Concert title.",
+            "nullable": true
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CategoryInventoryCheckDto"
+            },
+            "description": "Category-level inventory reconciliation checks.",
+            "nullable": true
+          },
+          "isInventoryConsistent": {
+            "type": "boolean",
+            "description": "Indicates whether all ticket categories are perfectly consistent (Remaining + Reserved + Sold == Total).",
+            "readOnly": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Inventory integrity audit report per concert."
+      },
+      "InventoryValidationReportDtoApiResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Indicates whether the request was processed successfully."
+          },
+          "message": {
+            "type": "string",
+            "description": "User-friendly response message or error summary.",
+            "nullable": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/InventoryValidationReportDto"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Detailed list of error messages (if any).",
+            "nullable": true
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "UTC timestamp of response generation.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Standard API response wrapper across the system."
+      },
+      "LoginRequestDto": {
+        "required": ["email", "password"],
+        "type": "object",
+        "properties": {
+          "email": {
+            "minLength": 1,
+            "type": "string",
+            "description": "Account email address.",
+            "format": "email"
+          },
+          "password": {
+            "minLength": 1,
+            "type": "string",
+            "description": "Account password."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Login request payload using email and password."
+      },
+      "ObjectApiResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Indicates whether the request was processed successfully."
+          },
+          "message": {
+            "type": "string",
+            "description": "User-friendly response message or error summary.",
+            "nullable": true
+          },
+          "data": {
+            "description": "Response payload data.",
+            "nullable": true
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Detailed list of error messages (if any).",
+            "nullable": true
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "UTC timestamp of response generation.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Standard API response wrapper across the system."
+      },
+      "PaymentSimulationRequestDto": {
+        "required": ["paymentMethod"],
+        "type": "object",
+        "properties": {
+          "paymentMethod": {
+            "minLength": 1,
+            "type": "string",
+            "description": "Payment method (e.g. \"VNPAY\", \"MOMO\", \"CREDIT_CARD\", \"GATE_WALLET\")."
+          },
+          "transactionReference": {
+            "type": "string",
+            "description": "Simulated transaction reference code from payment provider.",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Request payload for simulating online payment for a booking order."
+      },
+      "ProblemDetails": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "detail": {
+            "type": "string",
+            "nullable": true
+          },
+          "instance": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": {}
+      },
+      "RegisterRequestDto": {
+        "required": ["email", "fullName", "password"],
+        "type": "object",
+        "properties": {
+          "fullName": {
+            "maxLength": 100,
+            "minLength": 2,
+            "type": "string",
+            "description": "Full name of the user."
+          },
+          "email": {
+            "minLength": 1,
+            "type": "string",
+            "description": "Valid email address.",
+            "format": "email"
+          },
+          "password": {
+            "maxLength": 100,
+            "minLength": 6,
+            "type": "string",
+            "description": "Account password (minimum 6 characters)."
+          },
+          "phoneNumber": {
+            "type": "string",
+            "description": "Contact phone number (optional).",
+            "format": "tel",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Registration request payload for a new customer account."
+      },
+      "TicketCategoryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Ticket category unique identifier.",
+            "format": "uuid"
+          },
+          "concertId": {
+            "type": "string",
+            "description": "Associated concert identifier.",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "description": "Category name (e.g. VIP, Standard, GA).",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "description": "Detailed description of category benefits.",
+            "nullable": true
+          },
+          "price": {
+            "type": "number",
+            "description": "Unit ticket price (VND).",
+            "format": "double"
+          },
+          "totalQuantity": {
+            "type": "integer",
+            "description": "Initial total quantity of tickets allocated.",
+            "format": "int32"
+          },
+          "remainingQuantity": {
+            "type": "integer",
+            "description": "Available tickets remaining for reservation.",
+            "format": "int32"
+          },
+          "reservedQuantity": {
+            "type": "integer",
+            "description": "Tickets currently on hold (PendingPayment).",
+            "format": "int32"
+          },
+          "soldQuantity": {
+            "type": "integer",
+            "description": "Tickets successfully purchased and confirmed (Confirmed).",
+            "format": "int32"
+          },
+          "maxPerOrder": {
+            "type": "integer",
+            "description": "Maximum allowed tickets per booking order.",
+            "format": "int32"
+          },
+          "isSoldOut": {
+            "type": "boolean",
+            "description": "Indicates whether this category is completely sold out.",
+            "readOnly": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Detailed ticket category payload returned to clients and the operations dashboard."
+      },
+      "TicketCategoryDtoApiResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Indicates whether the request was processed successfully."
+          },
+          "message": {
+            "type": "string",
+            "description": "User-friendly response message or error summary.",
+            "nullable": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/TicketCategoryDto"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Detailed list of error messages (if any).",
+            "nullable": true
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "UTC timestamp of response generation.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Standard API response wrapper across the system."
+      },
+      "TicketDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Ticket unique identifier.",
+            "format": "uuid"
+          },
+          "ticketCode": {
+            "type": "string",
+            "description": "Display ticket code (e.g. \"TKT-2026-VIP-99482\").",
+            "nullable": true
+          },
+          "qrCodePayload": {
+            "type": "string",
+            "description": "QR code payload string for scanning at gate check-in.",
+            "nullable": true
+          },
+          "categoryName": {
+            "type": "string",
+            "description": "Ticket category name.",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/TicketStatus"
+          },
+          "issuedAt": {
+            "type": "string",
+            "description": "Issuance timestamp.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Electronic ticket details including QR code payload for gate admission."
+      },
+      "TicketStatus": {
+        "enum": [0, 1, 2],
+        "type": "integer",
+        "description": "Status of an individual ticket post-payment (Valid, Used, Revoked).",
+        "format": "int32"
+      },
+      "TopConcertStatsDto": {
+        "type": "object",
+        "properties": {
+          "concertId": {
+            "type": "string",
+            "description": "Concert identifier.",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "description": "Concert title.",
+            "nullable": true
+          },
+          "soldCount": {
+            "type": "integer",
+            "description": "Number of tickets sold.",
+            "format": "int32"
+          },
+          "totalCapacity": {
+            "type": "integer",
+            "description": "Total ticket capacity.",
+            "format": "int32"
+          },
+          "revenue": {
+            "type": "number",
+            "description": "Total revenue generated (VND).",
+            "format": "double"
+          },
+          "occupancyRate": {
+            "type": "number",
+            "description": "Venue occupancy rate (%).",
+            "format": "double",
+            "readOnly": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Detailed sales and occupancy metrics for an individual concert."
+      },
+      "UpdateBookingStatusDto": {
+        "required": ["newStatus", "reason"],
+        "type": "object",
+        "properties": {
+          "newStatus": {
+            "$ref": "#/components/schemas/BookingStatus"
+          },
+          "reason": {
+            "maxLength": 500,
+            "minLength": 5,
+            "type": "string",
+            "description": "Reason or operational justification for the status change."
+          }
+        },
+        "additionalProperties": false,
+        "description": "Request payload for manually updating a booking's status by Operator / Admin."
+      },
+      "UpdateConcertDto": {
+        "required": [
+          "artist",
+          "eventDate",
+          "saleEndDate",
+          "saleStartDate",
+          "title",
+          "venue"
+        ],
+        "type": "object",
+        "properties": {
+          "title": {
+            "maxLength": 250,
+            "minLength": 0,
+            "type": "string",
+            "description": "Title of the concert."
+          },
+          "artist": {
+            "maxLength": 200,
+            "minLength": 0,
+            "type": "string",
+            "description": "Main performing artist or band name."
+          },
+          "description": {
+            "type": "string",
+            "description": "Detailed description of the event.",
+            "nullable": true
+          },
+          "venue": {
+            "maxLength": 300,
+            "minLength": 0,
+            "type": "string",
+            "description": "Venue location."
+          },
+          "bannerUrl": {
+            "type": "string",
+            "description": "URL to the banner cover image.",
+            "nullable": true
+          },
+          "genre": {
+            "type": "string",
+            "description": "Music genre.",
+            "nullable": true
+          },
+          "eventDate": {
+            "type": "string",
+            "description": "Event performance date and time.",
+            "format": "date-time"
+          },
+          "saleStartDate": {
+            "type": "string",
+            "description": "Ticket sales start date and time.",
+            "format": "date-time"
+          },
+          "saleEndDate": {
+            "type": "string",
+            "description": "Ticket sales end date and time.",
+            "format": "date-time"
+          },
+          "isFlashSale": {
+            "type": "boolean",
+            "description": "Indicates whether this concert is part of a Flash Sale campaign."
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreateTicketCategoryDto"
+            },
+            "description": "Optional ticket categories initialized along with the concert.",
+            "nullable": true
+          },
+          "status": {
+            "$ref": "#/components/schemas/ConcertStatus"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Payload for updating concert information, including its publication status."
+      },
+      "UpdateInventoryDto": {
+        "type": "object",
+        "properties": {
+          "newTotalQuantity": {
+            "maximum": 1000000,
+            "minimum": 0,
+            "type": "integer",
+            "description": "New total ticket quantity to set (must not be lower than sold + reserved tickets).",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Input payload for adjusting ticket category inventory from the operations dashboard."
+      },
+      "UserProfileDto": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "User identifier.",
+            "format": "uuid"
+          },
+          "fullName": {
+            "type": "string",
+            "description": "Full name.",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "description": "Email address.",
+            "nullable": true
+          },
+          "phoneNumber": {
+            "type": "string",
+            "description": "Contact phone number.",
+            "nullable": true
+          },
+          "role": {
+            "type": "string",
+            "description": "User role name.",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Account creation timestamp (UTC).",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Profile information for the currently authenticated user."
+      },
+      "UserProfileDtoApiResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Indicates whether the request was processed successfully."
+          },
+          "message": {
+            "type": "string",
+            "description": "User-friendly response message or error summary.",
+            "nullable": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/UserProfileDto"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Detailed list of error messages (if any).",
+            "nullable": true
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "UTC timestamp of response generation.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Standard API response wrapper across the system."
+      },
+      "UserRole": {
+        "enum": [0, 1, 2],
+        "type": "integer",
+        "description": "User roles within the system (Customer, Operator, Admin).",
+        "format": "int32"
+      },
+      "ValidateVoucherRequestDto": {
+        "required": ["code"],
+        "type": "object",
+        "properties": {
+          "code": {
+            "minLength": 1,
+            "type": "string",
+            "description": "Promotional voucher code to validate."
+          },
+          "orderAmount": {
+            "maximum": 1000000000,
+            "minimum": 1,
+            "type": "number",
+            "description": "Order subtotal amount before discount (VND).",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Request payload for validating and calculating discount savings for a voucher before checkout."
+      },
+      "ValidateVoucherResponseDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Validated voucher code.",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "description": "Promotional offer description.",
+            "nullable": true
+          },
+          "originalAmount": {
+            "type": "number",
+            "description": "Original order subtotal before discount (VND).",
+            "format": "double"
+          },
+          "discountAmount": {
+            "type": "number",
+            "description": "Discount amount saved (VND).",
+            "format": "double"
+          },
+          "finalAmount": {
+            "type": "number",
+            "description": "Final order total payable after applying discount (VND).",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Response payload with validation results and calculated discount amounts."
+      },
+      "ValidateVoucherResponseDtoApiResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Indicates whether the request was processed successfully."
+          },
+          "message": {
+            "type": "string",
+            "description": "User-friendly response message or error summary.",
+            "nullable": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/ValidateVoucherResponseDto"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Detailed list of error messages (if any).",
+            "nullable": true
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "UTC timestamp of response generation.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Standard API response wrapper across the system."
+      },
+      "VoucherDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Voucher unique identifier.",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "description": "Voucher code (e.g. \"FLASHSALE20\").",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "description": "Promotional campaign description.",
+            "nullable": true
+          },
+          "discountType": {
+            "$ref": "#/components/schemas/DiscountType"
+          },
+          "discountValue": {
+            "type": "number",
+            "description": "Discount value (% or VND amount).",
+            "format": "double"
+          },
+          "maxDiscountAmount": {
+            "type": "number",
+            "description": "Maximum discount cap.",
+            "format": "double",
+            "nullable": true
+          },
+          "minOrderAmount": {
+            "type": "number",
+            "description": "Minimum order subtotal required.",
+            "format": "double"
+          },
+          "maxUsageCount": {
+            "type": "integer",
+            "description": "Total maximum usage count across the system.",
+            "format": "int32"
+          },
+          "currentUsageCount": {
+            "type": "integer",
+            "description": "Actual number of times redeemed so far.",
+            "format": "int32"
+          },
+          "maxUsagePerUser": {
+            "type": "integer",
+            "description": "Maximum redemptions allowed per user account.",
+            "format": "int32"
+          },
+          "validFrom": {
+            "type": "string",
+            "description": "Validity start date and time (UTC).",
+            "format": "date-time"
+          },
+          "validTo": {
+            "type": "string",
+            "description": "Validity expiration date and time (UTC).",
+            "format": "date-time"
+          },
+          "isActive": {
+            "type": "boolean",
+            "description": "Active status flag."
+          },
+          "isAvailable": {
+            "type": "boolean",
+            "description": "Indicates whether the voucher is currently active, has remaining quota, and is within valid dates.",
+            "readOnly": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Detailed voucher payload for customers and administrators."
+      },
+      "VoucherDtoApiResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Indicates whether the request was processed successfully."
+          },
+          "message": {
+            "type": "string",
+            "description": "User-friendly response message or error summary.",
+            "nullable": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/VoucherDto"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Detailed list of error messages (if any).",
+            "nullable": true
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "UTC timestamp of response generation.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Standard API response wrapper across the system."
+      },
+      "VoucherDtoPaginatedResult": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VoucherDto"
+            },
+            "description": "Items on the current page.",
+            "nullable": true
+          },
+          "pageIndex": {
+            "type": "integer",
+            "description": "Current page index (1-indexed).",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "Page size / number of items per page.",
+            "format": "int32"
+          },
+          "totalCount": {
+            "type": "integer",
+            "description": "Total count of items matching the query across all pages.",
+            "format": "int32"
+          },
+          "totalPages": {
+            "type": "integer",
+            "description": "Total number of pages.",
+            "format": "int32",
+            "readOnly": true
+          },
+          "hasPreviousPage": {
+            "type": "boolean",
+            "description": "Indicates whether a previous page exists.",
+            "readOnly": true
+          },
+          "hasNextPage": {
+            "type": "boolean",
+            "description": "Indicates whether a next page exists.",
+            "readOnly": true
+          }
+        },
+        "additionalProperties": false,
+        "description": "Paginated query result wrapper for large data collections."
+      },
+      "VoucherDtoPaginatedResultApiResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Indicates whether the request was processed successfully."
+          },
+          "message": {
+            "type": "string",
+            "description": "User-friendly response message or error summary.",
+            "nullable": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/VoucherDtoPaginatedResult"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Detailed list of error messages (if any).",
+            "nullable": true
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "UTC timestamp of response generation.",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Standard API response wrapper across the system."
+      }
+    },
+    "securitySchemes": {
+      "Bearer": {
+        "type": "http",
+        "description": "Enter JWT Token below (without 'Bearer' prefix). Example: eyJhbGciOi...",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  },
+  "security": [
+    {
+      "Bearer": []
+    }
+  ]
+}
